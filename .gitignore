@@ -1,0 +1,23 @@
+# Папки
+/logs/          # Папка с логами
+/venv/          # Виртуальное окружение (если называется venv)
+/.venv/         # Альтернативное название виртуального окружения
+/env/           # Еще один вариант названия
+/my-env/
+__pycache__/    # Кэш Python
+.idea/          # Для пользователей PyCharm
+.vscode/        # Для пользователей VS Code
+
+# Файлы
+*.log           # Все логи
+*.bak           # Резервные копии
+*.pyc           # Байт-код Python
+*.swp           # Файлы vim/neovim
+.DS_Store       # Для macOS
+.env            # Файлы с переменными окружения
+*.egg-info/     # Метаданные пакетов
+.pytest_cache/  # Кэш тестов
+
+# Playwright-specific
+playwright-report/
+test-results/
