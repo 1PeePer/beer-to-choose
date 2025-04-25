@@ -1,12 +1,9 @@
 # Папки
-/logs/          # Папка с логами
-/venv/          # Виртуальное окружение (если называется venv)
-/.venv/         # Альтернативное название виртуального окружения
-/env/           # Еще один вариант названия
+logs/
 /my-env/
-__pycache__/    # Кэш Python
-.idea/          # Для пользователей PyCharm
-.vscode/        # Для пользователей VS Code
+.vscode/
+__pycache__/
+results/
 
 # Файлы
 *.log           # Все логи
@@ -21,3 +18,4 @@ __pycache__/    # Кэш Python
 # Playwright-specific
 playwright-report/
 test-results/
+logs/

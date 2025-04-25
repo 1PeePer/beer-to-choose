@@ -7,6 +7,41 @@ import asyncio
 import time
 import sys
 import re
+import json
+
+# Configuration constants
+BROWSER_SETTINGS = {
+    "headless": False,
+    "args": [
+        "--disable-blink-features=AutomationControlled",
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--no-first-run",
+        "--no-zygote",
+        "--disable-gpu",
+        "--disable-geolocation",
+    ],
+    "timeout": 3000
+}
+
+CONTEXT_SETTINGS = {
+    "locale": "ru-RU",
+    "viewport": {"width": 1920, "height": 1080},
+    "extra_http_headers": {
+        "Referer": "https://lenta.com/",
+        "Sec-Fetch-Dest": "document"
+    },
+    "permissions": [],
+    "geolocation": None
+}
+
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+BASE_URL = "https://lenta.com"
+TIMEOUT = 5000
+LOG_MAX_SIZE_MB = 1
+RESULTS_DIR = "results"
 
 async def main() -> None:
     addresses = [
@@ -15,14 +50,11 @@ async def main() -> None:
     ]
     
     for address in addresses:
-        catalog = await AsyncLentaProductParse(address).parse()
+        parser = AsyncLentaProductParse(address)
+        catalog = await parser.parse()
         
         if catalog:
-            print(f"\nРезультаты для {address}:")
-            for idx, item in enumerate(catalog[:2], 1):  # Выводим первые 2 товара для примера
-                print(f"{idx}. {item['name']} - {item['volume']} - {item['price']} - {item['image']}")
-            print(" - -" * 50)
-            print(f"{len(catalog)}. {catalog[-1]['name']} - {catalog[-1]['volume']} - {catalog[-1]['price']} - {catalog[-1]['image']}")
+            parser._save_results(catalog, address)
         else:
             print(f"\nНе удалось получить данные для {address}")
 
@@ -38,7 +70,7 @@ class AsyncLentaProductParse:
         log_dir = Path(__file__).parent / "logs"
         log_dir.mkdir(exist_ok=True)
 
-        self._clean_logs_if_needed(log_dir, max_size_mb=1)
+        self._clean_logs_if_needed(log_dir, max_size_mb=LOG_MAX_SIZE_MB)
         
         logging.basicConfig(
             level=logging.INFO,
@@ -53,10 +85,16 @@ class AsyncLentaProductParse:
     
     def _clean_logs_if_needed(self, log_dir: Path, max_size_mb: float):
         """Clearing logs if necessary"""
-        total_size = sum(f.stat().st_size for f in log_dir.glob('*') if f.is_file())
-        if total_size > max_size_mb * 1024 * 1024:
-            for log_file in log_dir.glob('*'):
-                log_file.unlink()
+        try:
+            total_size = sum(f.stat().st_size for f in log_dir.glob('*') if f.is_file())
+            if total_size > max_size_mb * 1024 * 1024:
+                for log_file in log_dir.glob('*'):
+                    try:
+                        log_file.unlink()
+                    except Exception as e:
+                        self.logger.warning(f"Failed to delete log file {log_file}: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"Error during log cleanup: {str(e)}")
 
     async def __store_selection(self) -> None:
         """Store selection"""
@@ -97,8 +135,8 @@ class AsyncLentaProductParse:
             await self.page.click("a[href='https://lenta.com/catalog/alkogol-17036/']")
             self.logger.debug("sub-catalog opened ...")
 
-            await self.page.wait_for_selector("lu-search-categories-chips.ng-star-inserted")
-            await self.page.click("a[href^='https://lenta.com/catalog/pivo-sidr']")
+            await self.page.wait_for_selector("div[class='product-categories-chips ng-star-inserted']")
+            await self.page.click("a[href^='https://lenta.com/catalog/pivo-sidr-17059/']")
             self.logger.info("<- successfully navigated to product catalog")
 
         except Exception as e:
@@ -208,54 +246,59 @@ class AsyncLentaProductParse:
             self.logger.info(f"Starting parser for address: {self.address} -> -> ->")
             
             async with async_playwright() as p:
-                browser = await p.chromium.launch(
-                    headless=False,
-                    args=[
-                        "--disable-blink-features=AutomationControlled",
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-accelerated-2d-canvas",
-                        "--no-first-run",
-                        "--no-zygote",
-                        "--disable-gpu",
-                        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                    ],
-                    timeout=3000
-                )
-                self.context = await browser.new_context(
-                    locale="ru-RU",
-                    viewport={"width": 1920, "height": 1080},
-                    extra_http_headers={
-                        "Referer": "https://lenta.com/",
-                        "Sec-Fetch-Dest": "document"
-                    }
-                )
-                self.page = await self.context.new_page()
+                browser_settings = BROWSER_SETTINGS.copy()
+                browser_settings["args"].append(f"--user-agent={USER_AGENT}")
+                
+                async with await p.chromium.launch(**browser_settings) as browser:
+                    async with await browser.new_context(**CONTEXT_SETTINGS) as context:
+                        await context.route("**/*", lambda route: route.continue_() if not route.request.resource_type == "geolocation" else route.abort())
+                        
+                        self.page = await context.new_page()
+                        await self.page.goto(BASE_URL, timeout=TIMEOUT)
+                        self.logger.info("Main page loaded -> ->")
 
-                await self.page.goto("https://lenta.com/", timeout=5000)
-                self.logger.info("Main page loaded -> ->")
+                        await self.__store_selection()
+                        await self.__go_to_beer_catalog()
 
-                await self.__store_selection()
-                await self.__go_to_beer_catalog()
+                        total_pages = await self.__number_of_pages()
+                        self.logger.info(f"Total pages to parse: {total_pages} -> ->")
 
-                total_pages = await self.__number_of_pages()
-                self.logger.info(f"Total pages to parse: {total_pages} -> ->")
+                        catalog = await self.__get_beer_info(total_pages)
 
-                catalog = await self.__get_beer_info(total_pages)
-
-                elapsed_seconds = time.perf_counter() - self.start_time
-                hours, remainder = divmod(elapsed_seconds, 3600)
-                minutes, seconds = divmod(remainder, 60)
-                self.logger.info(
-                    f"<- <- <- parser finished. Execution time: "
-                    f"{int(minutes)} min {seconds:.1f} sec"
-                )
-                return catalog
+                        elapsed_seconds = time.perf_counter() - self.start_time
+                        hours, remainder = divmod(elapsed_seconds, 3600)
+                        minutes, seconds = divmod(remainder, 60)
+                        self.logger.info(
+                            f"<- <- <- parser finished. Execution time: "
+                            f"{int(minutes)} min {seconds:.1f} sec"
+                        )
+                        return catalog
 
         except Exception as e:
             self.logger.critical(f"Critical error: {str(e)}", exc_info=True)
             return None
+
+    def _save_results(self, catalog: List[Dict], address: str) -> None:
+        """Save parsing results to a JSON file"""
+        try:
+            results_dir = Path(__file__).parent / RESULTS_DIR
+            results_dir.mkdir(exist_ok=True)
+            
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            # Очищаем адрес от недопустимых символов в имени файла
+            safe_address = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in address)
+            filename = f"lenta_products_{safe_address}_{timestamp}.json"
+            
+            with open(results_dir / filename, 'w', encoding='utf-8') as f:
+                json.dump({
+                    'address': address,
+                    'timestamp': timestamp,
+                    'products': catalog
+                }, f, ensure_ascii=False, indent=2)
+                
+            self.logger.info(f"Results saved to {filename}")
+        except Exception as e:
+            self.logger.error(f"Error saving results: {str(e)}")
 
 if __name__ == "__main__":
     asyncio.run(main())
