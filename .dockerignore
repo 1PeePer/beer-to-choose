@@ -1,0 +1,22 @@
+# Игнорируем директории с результатами и логами
+logs/
+results/
+
+# Игнорируем файлы Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Игнорируем виртуальное окружение
+venv/
+env/
+tmp/
+my-env/
+
+# Игнорируем файлы IDE
+.vscode/
+.idea/
+
+# Игнорируем файлы Git
+.git/
+.gitignore 

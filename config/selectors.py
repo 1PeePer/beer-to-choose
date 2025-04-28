@@ -1,0 +1,25 @@
+# Selectors
+SELECTORS = {
+    "address_block": "div.address-block.ng-star-inserted",
+    "address_form": "form.ng-untouched.ng-pristine.ng-valid",
+    "address_input": "input.p-element.p-autocomplete-input.p-inputtext.p-component.ng-star-inserted",
+    "address_item": "li.p-ripple.p-element.p-autocomplete-item.ng-star-inserted",
+    "confirm_button": "button.p-element.p-button.p-button-primary.large.w-100.p-component.ng-star-inserted",
+    "catalog_button": "lu-catalog-button.ng-star-inserted",
+    "alcohol_category": "a[href^='https://lenta.com/catalog/alko']",
+    "beer_category": "a[href^='https://lenta.com/catalog/pivo']",
+    "product_grid": "div.lu-grid",
+    "product_item": "div[class='lu-grid__item ng-star-inserted']",
+    "product_name": "span.card-name_content",
+    "product_volume": "p.card-name_package",
+    "product_price": "span.main-price, span[class^='main-price']",
+    "product_image": "img.lu-product-card-image",
+    "pagination": "nav.ng-star-inserted",
+    "pagination_list": "ul.pagination",
+    "product_details": "div.product-details",
+    "product_details_name": "h1.product-name",
+    "product_details_price": "span.main-price",
+    "product_details_volume": "p.product-volume",
+    "product_details_description": "div.product-description",
+    "product_details_image": "img.product-image"
+} 
