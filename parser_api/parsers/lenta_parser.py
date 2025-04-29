@@ -1,26 +1,21 @@
-from playwright.async_api import async_playwright, Page
+from playwright.async_api import async_playwright
 from typing import List, Dict, Optional
-from datetime import datetime
-from pathlib import Path
-import asyncio
 import time
-import json
 import re
-import sys
 
-from config.browser import (
+
+from parser_api.config.browser import (
     BROWSER_SETTINGS,
     CONTEXT_SETTINGS,
     USER_AGENT,
     BASE_URL,
     TIMEOUT,
-    RESULTS_DIR
 )
 
-from config.selectors import SELECTORS
-from utils.logging import setup_logging
-from utils.name_processor import process_product_name
-from models.product import Product
+from parser_api.config.selectors import SELECTORS
+from parser_api.utils.logging import setup_logging
+from parser_api.utils.name_processor import process_product_name
+from parser_api.models.product import Product
 
 class AsyncLentaProductParse:
     def __init__(self, address: str) -> None:
@@ -235,39 +230,3 @@ class AsyncLentaProductParse:
         except Exception as e:
             self.logger.critical(f"Critical error: {str(e)}", exc_info=True)
             return None
-
-    def _save_results(self, catalog: List[Dict], address: str) -> None:
-        """Save parsing results to a JSON file"""
-        try:
-            results_dir = Path(__file__).parent.parent / RESULTS_DIR
-            results_dir.mkdir(exist_ok=True)
-            
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            # Очищаем адрес от недопустимых символов в имени файла
-            safe_address = "".join(c if c.isalnum() or c in (' ', '-', '_') else '_' for c in address)
-            filename = f"lenta_products_{safe_address}_{timestamp}.json"
-            
-            with open(results_dir / filename, 'w', encoding='utf-8') as f:
-                json.dump({
-                    'address': address,
-                    'timestamp': timestamp,
-                    'products': catalog
-                }, f, ensure_ascii=False, indent=2)
-                
-            self.logger.info(f"Results saved to {filename}")
-        except Exception as e:
-            self.logger.error(f"Error saving results: {str(e)}")
-
-if __name__ == "__main__":
-    # Тестовый адрес для проверки
-    test_address = "Москва, Чонгарский бул., 7"
-    parser = AsyncLentaProductParse(test_address)
-    
-    # Запускаем парсер
-    result = asyncio.run(parser.parse())
-    
-    if result:
-        print(f"Successfully parsed {len(result)} products")
-    else:
-        print("Parser failed")
-        sys.exit(1) 

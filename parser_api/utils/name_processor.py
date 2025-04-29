@@ -1,6 +1,6 @@
 from typing import Tuple, Optional, Dict
 import re
-from config.product_types import (
+from parser_api.config.product_types import (
     PRODUCT_TYPES,
     BEER_COLOR_TYPES,
     CLARIFICATION_TYPES,

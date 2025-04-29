@@ -1,4 +1,4 @@
-from config.browser import LOG_MAX_SIZE_MB
+from parser_api.config.browser import LOG_MAX_SIZE_MB
 from datetime import datetime
 from pathlib import Path
 import logging
